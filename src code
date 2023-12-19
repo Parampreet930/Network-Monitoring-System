@@ -1,0 +1,151 @@
+import sys
+import psutil
+import socket
+import pywifi
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QLineEdit, QMessageBox
+from PyQt5.QtCore import Qt
+
+class LoginWindow(QWidget):
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("Login")
+        self.setGeometry(100, 100, 400, 200)
+
+        self.layout = QVBoxLayout()
+
+        self.user_label = QLabel("Username:")
+        self.layout.addWidget(self.user_label)
+
+        self.user_input = QLineEdit()
+        self.layout.addWidget(self.user_input)
+
+        self.password_label = QLabel("Password:")
+        self.layout.addWidget(self.password_label)
+
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        self.layout.addWidget(self.password_input)
+
+        self.login_button = QPushButton("Login")
+        self.login_button.clicked.connect(self.check_login)
+        self.layout.addWidget(self.login_button)
+
+        self.setLayout(self.layout)
+
+    def check_login(self):
+        username = self.user_input.text()
+        password = self.password_input.text()
+
+        # You can replace these with your actual login credentials
+        if username == "user" and password == "password":
+            self.main_window.show()
+            self.close()
+        else:
+            QMessageBox.warning(self, "Login Failed", "Invalid username or password")
+
+class NetworkMonitor(QWidget):
+    def __init__(self, login_window):
+        super().__init__()
+        self.login_window = login_window
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("Network Monitoring")
+        self.setGeometry(100, 100, 400, 450)
+
+        self.setStyleSheet("background-color: #f0f0f0;")  # Set background color
+
+        self.layout = QVBoxLayout()
+
+        self.logout_button = QPushButton("Logout")
+        self.logout_button.clicked.connect(self.logout)
+        self.layout.addWidget(self.logout_button)
+
+        self.port_label = QLabel()
+        self.layout.addWidget(self.port_label)
+
+        self.ip_label = QLabel()
+        self.layout.addWidget(self.ip_label)
+
+        self.network_label = QLabel()
+        self.layout.addWidget(self.network_label)
+
+        self.available_networks_label = QLabel()
+        self.layout.addWidget(self.available_networks_label)
+
+        self.cpu_label = QLabel()
+        self.mem_label = QLabel()
+        self.layout.addWidget(self.cpu_label)
+        self.layout.addWidget(self.mem_label)
+
+        self.upload_speed_label = QLabel()
+        self.download_speed_label = QLabel()
+        self.layout.addWidget(self.upload_speed_label)
+        self.layout.addWidget(self.download_speed_label)
+
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.refresh_data)
+        self.layout.addWidget(self.refresh_button)
+
+        self.setLayout(self.layout)
+
+        self.refresh_data()
+
+    def get_available_networks(self):
+        wifi = pywifi.PyWiFi()
+        iface = wifi.interfaces()[0]
+        iface.scan()
+        scan_results = iface.scan_results()
+        return [result.ssid for result in scan_results]
+
+    def get_network_speed(self):
+        network_info = psutil.net_io_counters()
+        upload_speed = network_info.bytes_sent
+        download_speed = network_info.bytes_recv
+        return upload_speed, download_speed
+
+    def refresh_data(self):
+        port_number = self.get_port_number()
+        self.port_label.setText(f"Port Number: {port_number}")
+
+        ip_address = socket.gethostbyname(socket.gethostname())
+        self.ip_label.setText(f"IP Address: {ip_address}")
+
+        network_name = socket.gethostname()
+        self.network_label.setText(f"Connected Network: {network_name}")
+
+        available_networks = self.get_available_networks()
+        self.available_networks_label.setText(f"Available Networks: {', '.join(available_networks)}")
+
+        cpu_percent = psutil.cpu_percent(interval=1)
+        mem_info = psutil.virtual_memory()
+        self.cpu_label.setText(f"CPU Usage: {cpu_percent}%")
+        self.mem_label.setText(f"Memory Usage: Total: {mem_info.total} bytes, Used: {mem_info.used} bytes")
+
+        upload_speed, download_speed = self.get_network_speed()
+        self.upload_speed_label.setText(f"Upload Speed: {upload_speed} bytes/sec")
+        self.download_speed_label.setText(f"Download Speed: {download_speed} bytes/sec")
+
+    def get_port_number(self):
+        temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        temp_socket.bind(('localhost', 0))
+        port_number = temp_socket.getsockname()[1]
+        temp_socket.close()
+        return port_number
+
+    def logout(self):
+        self.close()
+        self.login_window.show()
+
+def main():
+    app = QApplication(sys.argv)
+    login_window = LoginWindow(main_window=NetworkMonitor(login_window=None))
+    login_window.show()
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
